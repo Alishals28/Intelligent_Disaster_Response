@@ -16,20 +16,21 @@ def test_graph_functionality():
     print("Loading shelters...")
     disaster_graph.load_shelters()
     print(disaster_graph.shelters)  # debug
-    
-    # Add sample danger zones with smaller radius
+
+    # Add sample danger zones with the new functionality
     print("Adding danger zones...")
     disaster_graph.add_danger_zone(24.8607, 67.0011, 200)  # 200m radius
     disaster_graph.add_danger_zone(24.8700, 67.0200, 150)  # 150m radius
-    
+    disaster_graph.add_danger_zone(24.8750, 67.0100, 300)  # 300m radius
+
     # Print the number of danger zones
-    print(f"Number of danger zones: {disaster_graph.get_number_of_danger_zones()}")
-    
+    print(f"Number of danger zones: {len(disaster_graph.danger_zones)}")
+
     # Test path finding
     print("Testing safe path finding...")
     start = (24.8607, 67.0011)  # Saddar area
     end = (24.8823, 67.0337)    # Gulshan-e-Iqbal
-    
+
     path = disaster_graph.find_safe_path(
         start[0], start[1],
         end[0], end[1]
@@ -37,7 +38,7 @@ def test_graph_functionality():
     
     # Create a folium map
     m = folium.Map(location=[24.8607, 67.0011], zoom_start=13)
-    
+
     # Add shelters to the map
     print("Adding shelters to the map...")
     for shelter in disaster_graph.shelters.values():
@@ -56,16 +57,16 @@ def test_graph_functionality():
             popup=f"Service: {service['name']}"
         ).add_to(m)
 
-    # Add danger zones to the map as subtle semi-transparent red circles
+    # Add danger zones to the map
     print("Adding danger zones to the map...")
-    for node in disaster_graph.danger_zones:
+    for lat, lon, radius in disaster_graph.danger_zones:
         folium.Circle(
-            location=(disaster_graph.graph.nodes[node]['y'], disaster_graph.graph.nodes[node]['x']),
-            radius=200,  # Reduced radius to make circles smaller
+            location=(lat, lon),
+            radius=radius,  # Dynamically adjusted radius
             color='red',
             fill=True,
             fill_color='red',
-            fill_opacity=0.2  # Lighter and more subtle red
+            fill_opacity=0.2
         ).add_to(m)
 
     # Add the safe path to the map if found

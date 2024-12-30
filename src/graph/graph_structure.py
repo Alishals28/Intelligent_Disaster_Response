@@ -18,7 +18,7 @@ class DisasterGraph:
         self.graph = ox.graph_from_place(f"{city}, {country}", network_type='drive')
         self.graph = ox.distance.add_edge_lengths(self.graph)  # Add edge lengths in meters
         
-    def load_emergency_services(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\emergency_services.csv'):
+    def load_emergency_services(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\emergency_services.csv'):
         """Load emergency services into graph"""
         services_df = pd.read_csv(filename)
         
@@ -37,7 +37,7 @@ class DisasterGraph:
                 'location': (row['latitude'], row['longitude'])
             }
             
-    def load_shelters(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\shelters.csv'):
+    def load_shelters(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\shelters.csv'):
         """Load shelter locations into graph"""
         shelters_df = pd.read_csv(filename)
         
@@ -55,26 +55,34 @@ class DisasterGraph:
             }
     
     def add_danger_zone(self, lat, lon, radius):
-        """Add a danger zone affecting nearby nodes"""
-        # Find center node
-        center_node = ox.nearest_nodes(self.graph, lon, lat)
-        
-        # Find all nodes within radius
-        affected_nodes = nx.single_source_dijkstra_path_length(
-            self.graph, 
-            center_node, 
-            cutoff=radius,
-            weight='length'
-        )
-        
-        # Add affected nodes to danger zones
-        self.danger_zones.update(affected_nodes.keys())
-        
-        # Update edge weights for affected areas
-        for node in affected_nodes:
-            for neighbor in self.graph.neighbors(node):
-                self.weights[(node, neighbor)] = float('inf')
-    
+        """
+        Add a danger zone. If the new coordinate overlaps with an existing danger zone,
+        extend the radius of the existing zone to include the new coordinate.
+        """
+        import math
+
+        def distance(lat1, lon1, lat2, lon2):
+            # Calculate distance in meters between two lat/lon points
+            R = 6371000  # Earth's radius in meters
+            phi1, phi2 = math.radians(lat1), math.radians(lat2)
+            delta_phi = math.radians(lat2 - lat1)
+            delta_lambda = math.radians(lon2 - lon1)
+            a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+            return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    # Check if the new danger zone overlaps with any existing ones
+        for existing_zone in list(self.danger_zones):
+            existing_lat, existing_lon, existing_radius = existing_zone
+            dist_to_center = distance(lat, lon, existing_lat, existing_lon)
+            if dist_to_center <= existing_radius:
+                # Extend the radius of the existing zone if the new point is outside its current boundary
+                new_radius = max(existing_radius, dist_to_center + radius)
+                self.danger_zones.remove(existing_zone)
+                self.danger_zones.add((existing_lat, existing_lon, new_radius))
+                return
+
+    # If no overlap, add the new danger zone
+        self.danger_zones.add((lat, lon, radius))
     def find_safe_path(self, start_lat, start_lon, end_lat, end_lon):
         """Find safest path between two points"""
         # Get nearest nodes to start and end points
