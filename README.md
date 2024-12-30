@@ -54,4 +54,4 @@ This project utilizes graph-based modeling and the A* search algorithm to optimi
 2. Create a new branch for your feature or bugfix.
 3. Submit a pull request with a detailed description of your changes.
 
-## in the graph_structure.py file in line 21 and 40 where the filepath for csv files are written
+#in the graph_structure.py file in line 21 and 40 where the filepath for csv files are written add your local path for the csv files(respective of the path where you have saved)
