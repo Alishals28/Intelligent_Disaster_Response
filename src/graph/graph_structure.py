@@ -18,7 +18,7 @@ class DisasterGraph:
         self.graph = ox.graph_from_place(f"{city}, {country}", network_type='drive')
         self.graph = ox.distance.add_edge_lengths(self.graph)  # Add edge lengths in meters
         
-    def load_emergency_services(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\emergency_services.csv'):
+    def load_emergency_services(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\emergency_services.csv'):
         """Load emergency services into graph"""
         services_df = pd.read_csv(filename)
         
@@ -37,7 +37,7 @@ class DisasterGraph:
                 'location': (row['latitude'], row['longitude'])
             }
             
-    def load_shelters(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\shelters.csv'):
+    def load_shelters(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\shelters.csv'):
         """Load shelter locations into graph"""
         shelters_df = pd.read_csv(filename)
         
