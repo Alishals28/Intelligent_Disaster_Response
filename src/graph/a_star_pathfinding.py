@@ -1,6 +1,6 @@
 from heapq import heappush, heappop
 from math import sqrt
-from src.graph.graph_structure import DisasterGraph
+from graph_structure import DisasterGraph
 
 def heuristic(node_a, node_b):
     """

@@ -7,7 +7,7 @@ def test_graph_functionality():
     
     # Build graph for Karachi
     print("Building graph from OSM data...")
-    disaster_graph.build_from_osm("Karachi", "Pakistan")
+    disaster_graph.build_from_osm("Saddar, Karachi, Pakistan")
     
     # Load emergency services and shelters
     print("Loading emergency services...")
