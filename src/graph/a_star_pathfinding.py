@@ -1,90 +1,180 @@
 from heapq import heappush, heappop
-from math import sqrt
+from math import sqrt, radians, sin, cos, asin
+import networkx as nx
+import osmnx as ox
 from graph_structure import DisasterGraph
 
-def heuristic(node_a, node_b):
-    """
-    Calculate the Euclidean distance as the heuristic.
-    """
-    return sqrt((node_a[0] - node_b[0])**2 + (node_a[1] - node_b[1])**2)
+class PathFinder:
+    def __init__(self, disaster_graph):
+        self.graph = disaster_graph.graph
+        self.emergency_services = disaster_graph.emergency_services
+        
+    def haversine_distance(self, lat1, lon1, lat2, lon2):
+        """
+        Calculate the great circle distance between two points 
+        on the earth (specified in decimal degrees)
+        """
+        # Convert decimal degrees to radians
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+        
+        # Haversine formula
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a))
+        # Radius of earth in kilometers
+        r = 6371
+        return c * r * 1000  # Convert to meters
 
-def a_star(graph, start, goal):
-    """
-    Perform the A* algorithm to find the quickest path.
+    def heuristic(self, node_a, node_b):
+        """
+        Calculate the Euclidean distance as the heuristic.
+        """
+        coord_a = (self.graph.nodes[node_a]['y'], self.graph.nodes[node_a]['x'])
+        coord_b = (self.graph.nodes[node_b]['y'], self.graph.nodes[node_b]['x'])
+        return sqrt((coord_a[0] - coord_b[0])**2 + (coord_a[1] - coord_b[1])**2)
 
-    Parameters:
-        graph: The graph representation (NetworkX Graph).
-        start: The starting node.
-        goal: The goal node.
+    def a_star(self, start, goal):
+        """
+        Perform the A* algorithm to find the quickest path.
 
-    Returns:
-        path: A list of nodes representing the path from start to goal.
-    """
-    open_set = []
-    heappush(open_set, (0, start))
+        Parameters:
+            start: The starting node.
+            goal: The goal node.
 
-    came_from = {}
-    g_score = {node: float('inf') for node in graph.nodes}
-    g_score[start] = 0
+        Returns:
+            path: A list of nodes representing the path from start to goal.
+        """
+        open_set = []
+        heappush(open_set, (0, start))
 
-    f_score = {node: float('inf') for node in graph.nodes}
-    f_score[start] = heuristic(graph.nodes[start]['location'], graph.nodes[goal]['location'])
+        came_from = {}
+        g_score = {node: float('inf') for node in self.graph.nodes}
+        g_score[start] = 0
 
-    while open_set:
-        _, current = heappop(open_set)
+        f_score = {node: float('inf') for node in self.graph.nodes}
+        f_score[start] = self.heuristic(start, goal)
 
-        if current == goal:
-            # Reconstruct path
-            path = []
-            while current in came_from:
-                path.append(current)
-                current = came_from[current]
-            path.append(start)
-            return path[::-1]
+        while open_set:
+            current = heappop(open_set)[1]
 
-        for neighbor in graph.neighbors(current):
-            tentative_g_score = g_score[current] + graph[current][neighbor].get('weight', 1)
+            if current == goal:
+                path = []
+                while current in came_from:
+                    path.append(current)
+                    current = came_from[current]
+                path.append(start)
+                path.reverse()
+                return path
 
-            if tentative_g_score < g_score[neighbor]:
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + heuristic(graph.nodes[neighbor]['location'], graph.nodes[goal]['location'])
-                heappush(open_set, (f_score[neighbor], neighbor))
+            for neighbor in self.graph.neighbors(current):
+                tentative_g_score = g_score[current] + self.graph.edges[current, neighbor, 0]['length']
 
-    return None  # No path found
+                if tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = g_score[neighbor] + self.heuristic(neighbor, goal)
+                    heappush(open_set, (f_score[neighbor], neighbor))
+
+        return None
+
+    def get_path_coordinates(self, path):
+        """
+        Convert path node IDs to list of coordinates for visualization
+        """
+        if not path:
+            return []
+            
+        return [(self.graph.nodes[node]['y'], self.graph.nodes[node]['x']) 
+                for node in path]
+
+    def calculate_path_distance(self, path):
+        """
+        Calculate the total distance of the path in meters.
+        """
+        if not path:
+            return 0
+        
+        total_distance = 0
+        for i in range(len(path) - 1):
+            node_a = path[i]
+            node_b = path[i + 1]
+            total_distance += self.graph.edges[node_a, node_b, 0]['length']
+        
+        return total_distance
+
+def find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, service_type):
+    nearest_service_node = None
+    nearest_service_distance = float('inf')
+    for node, data in disaster_graph.emergency_services.items():
+        if data['type'] == service_type:
+            distance = pathfinder.haversine_distance(danger_zone_lat, danger_zone_lon, data['location'][0], data['location'][1])
+            if distance < nearest_service_distance:
+                nearest_service_distance = distance
+                nearest_service_node = node
+
+    if nearest_service_node is None:
+        print(f"No {service_type} found.")
+        return None, None, None
+
+    start_node = ox.nearest_nodes(disaster_graph.graph, danger_zone_lon, danger_zone_lat)
+    goal_node = nearest_service_node
+
+    path = pathfinder.a_star(start_node, goal_node)
+    if path:
+        path_coords = pathfinder.get_path_coordinates(path)
+        total_distance = pathfinder.calculate_path_distance(path)
+        return path_coords, total_distance, disaster_graph.emergency_services[nearest_service_node]['name']
+    else:
+        print(f"No path found to the nearest {service_type}.")
+        return None, None, None
 
 def main():
-    # Initialize DisasterGraph
+    # Initialize the disaster graph
     disaster_graph = DisasterGraph()
-
-    # Build the graph from OpenStreetMap
-    print("Building graph from OSM data...")
-    disaster_graph.build_from_osm("Karachi", "Pakistan")
-
-    # Load data
-    print("Loading emergency services...")
+    disaster_graph.build_from_osm("Saddar, Karachi, Pakistan")
     disaster_graph.load_emergency_services()
-    print("Loading shelters...")
     disaster_graph.load_shelters()
 
-    # Define start (emergency service) and end (disaster location)
-    start = (24.8607, 67.0011)  # Example location for emergency service
-    goal = (24.8700, 67.0200)   # Example location for disaster zone
+    # Add a sample danger zone
+    danger_zone_lat, danger_zone_lon = 24.8750, 67.0100
+    disaster_graph.add_danger_zone(danger_zone_lat, danger_zone_lon, 200)  # 200m radius
 
-    # Find the closest nodes in the graph
-    start_node = disaster_graph.find_closest_node(start[0], start[1])
-    goal_node = disaster_graph.find_closest_node(goal[0], goal[1])
+    # Initialize the pathfinder
+    pathfinder = PathFinder(disaster_graph)
 
-    print(f"Start node: {start_node}, Goal node: {goal_node}")
+    # Find the nearest fire station
+    fire_station_path, fire_station_distance, fire_station_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'fire_station')
+    if fire_station_path:
+        print("Path to nearest fire station found!")
+        print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
+        print("Path coordinates to fire station:")
+        for coord in fire_station_path:
+            print(coord)
+        print(f"Total distance to fire station: {fire_station_distance/1000:.2f} km")
+        print(f"Nearest fire station: {fire_station_name}")
 
-    # Perform A* algorithm
-    print("Finding quickest path using A*...")
-    path = a_star(disaster_graph.graph, start_node, goal_node)
+    # Find the nearest police station
+    police_station_path, police_station_distance, police_station_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'police station')
+    if police_station_path:
+        print("Path to nearest police station found!")
+        print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
+        print("Path coordinates to police station:")
+        for coord in police_station_path:
+            print(coord)
+        print(f"Total distance to police station: {police_station_distance/1000:.2f} km")
+        print(f"Nearest police station: {police_station_name}")
 
-    if path:
-        print("Path found:", path)
-    else:
-        print("No path found!")
+    # Find the nearest hospital
+    hospital_path, hospital_distance, hospital_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'hospital')
+    if hospital_path:
+        print("Path to nearest hospital found!")
+        print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
+        print("Path coordinates to hospital:")
+        for coord in hospital_path:
+            print(coord)
+        print(f"Total distance to hospital: {hospital_distance/1000:.2f} km")
+        print(f"Nearest hospital: {hospital_name}")
 
 if __name__ == "__main__":
     main()
