@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 import folium
+import osmnx as ox
 import io
 from graph_structure import DisasterGraph  # Import the DisasterGraph class
 from a_star_pathfinding import PathFinder, find_nearest_service  # Correctly import PathFinder and find_nearest_service
@@ -66,6 +67,13 @@ class SelectionPage(QWidget):
         victim_button.clicked.connect(self.on_victim_button_clicked)
         layout.addWidget(victim_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.setFont(QFont("Arial", 18))
+        back_button.setStyleSheet("background-color: red; color: white; padding: 20px 40px;")
+        back_button.clicked.connect(self.on_back_button_clicked)
+        layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
         self.setLayout(layout)
 
     def on_rescue_button_clicked(self):
@@ -78,13 +86,17 @@ class SelectionPage(QWidget):
         self.stacked_layout.setCurrentIndex(3)
         # Hardcoded disaster zone coordinates for affected victim
         disaster_lat, disaster_lon = 24.8750, 67.0100
-        self.main_window.user_map_page.update_disaster_info(disaster_lat, disaster_lon, role='user')
+        self.main_window.user_map_page.update_disaster_info(disaster_lat, disaster_lon, role='victim')
+
+    def on_back_button_clicked(self):
+        self.stacked_layout.setCurrentIndex(0)
 
 class MapPage(QWidget):
     coordinatesUpdated = pyqtSignal(str)
 
-    def __init__(self, disaster_graph, parent=None):
+    def __init__(self, stacked_layout, disaster_graph, parent=None):
         super().__init__(parent)
+        self.stacked_layout = stacked_layout
         self.disaster_graph = disaster_graph
         self.pathfinder = PathFinder(disaster_graph)
         self.initUI()
@@ -121,10 +133,20 @@ class MapPage(QWidget):
         self.emergency_message_label.setStyleSheet("color: red; padding: 10px;")
         self.side_panel_layout.addWidget(self.emergency_message_label)
 
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.setFont(QFont("Arial", 18))
+        back_button.setStyleSheet("background-color: red; color: white; padding: 20px 40px;")
+        back_button.clicked.connect(self.on_back_button_clicked)
+        self.side_panel_layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
         layout.addWidget(self.side_panel)
 
         self.setLayout(layout)
         self.update_map()
+
+    def on_back_button_clicked(self):
+        self.stacked_layout.setCurrentIndex(1)
 
     def update_map(self, paths=None):
         # Generate the map
@@ -175,41 +197,69 @@ class MapPage(QWidget):
         new_text = current_text + "\n" + coordinates
         self.coordinates_label.setText(new_text)
 
-        # Find nearest services
-        hospital_path, hospital_distance, hospital_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'hospital')
-        fire_station_path, fire_station_distance, fire_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'fire_station')
-        police_station_path, police_station_distance, police_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'police_station')
+        if role == 'victim':
+            # Find nearest shelter
+            nearest_shelter = None
+            nearest_shelter_distance = float('inf')
+            for node, data in self.disaster_graph.shelters.items():
+                distance = self.pathfinder.haversine_distance(lat, lon, data['location'][0], data['location'][1])
+                if distance < nearest_shelter_distance:
+                    nearest_shelter_distance = distance
+                    nearest_shelter = data
 
-        # Handle cases where no path is found
-        if hospital_distance is None:
-            hospital_distance = float('inf')
-            hospital_name = "No path found"
-        if fire_station_distance is None:
-            fire_station_distance = float('inf')
-            fire_station_name = "No path found"
-        if police_station_distance is None:
-            police_station_distance = float('inf')
-            police_station_name = "No path found"
+            if nearest_shelter:
+                nearest_services_text = f"Nearest Shelter: {nearest_shelter['name']} ({nearest_shelter_distance/1000:.2f} km)"
+                self.nearest_services_label.setText(nearest_services_text)
+                self.emergency_message_label.setText("Calling and sending them immediately")
+            else:
+                self.nearest_services_label.setText("No shelter found")
+                self.emergency_message_label.setText("")
 
-        # Update the nearest services label
-        nearest_services_text = f"Nearest Hospital: {hospital_name} ({hospital_distance/1000:.2f} km)\n"
-        nearest_services_text += f"Nearest Fire Station: {fire_station_name} ({fire_station_distance/1000:.2f} km)\n"
-        nearest_services_text += f"Nearest Police Station: {police_station_name} ({police_station_distance/1000:.2f} km)"
-        self.nearest_services_label.setText(nearest_services_text)
+            # Update the map with the nearest shelter path
+            start_node = ox.nearest_nodes(self.disaster_graph.graph, lon, lat)
+            goal_node = ox.nearest_nodes(self.disaster_graph.graph, nearest_shelter['location'][1], nearest_shelter['location'][0])
+            path = self.pathfinder.a_star(start_node, goal_node)
+            if path:
+                path_coords = self.pathfinder.get_path_coordinates(path)
+                self.update_map([path_coords])
+            else:
+                self.update_map()
 
-        # Update the map with paths
-        paths = []
-        if hospital_path:
-            paths.append(hospital_path)
-        if fire_station_path:
-            paths.append(fire_station_path)
-        if police_station_path:
-            paths.append(police_station_path)
-        self.update_map(paths)
+        else:
+            # Find nearest services
+            hospital_path, hospital_distance, hospital_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'hospital')
+            fire_station_path, fire_station_distance, fire_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'fire_station')
+            police_station_path, police_station_distance, police_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'police_station')
 
-        # Add emergency message for rescue teams
-        if role == 'user':
-            self.emergency_message_label.setText("Calling and sending them asap")
+            # Handle cases where no path is found
+            if hospital_distance is None:
+                hospital_distance = float('inf')
+                hospital_name = "No path found"
+            if fire_station_distance is None:
+                fire_station_distance = float('inf')
+                fire_station_name = "No path found"
+            if police_station_distance is None:
+                police_station_distance = float('inf')
+                police_station_name = "No path found"
+
+            # Update the nearest services label
+            nearest_services_text = f"Nearest Hospital: {hospital_name} ({hospital_distance/1000:.2f} km)\n"
+            nearest_services_text += f"Nearest Fire Station: {fire_station_name} ({fire_station_distance/1000:.2f} km)\n"
+            nearest_services_text += f"Nearest Police Station: {police_station_name} ({police_station_distance/1000:.2f} km)"
+            self.nearest_services_label.setText(nearest_services_text)
+
+            # Update the map with paths
+            paths = []
+            if hospital_path:
+                paths.append(hospital_path)
+            if fire_station_path:
+                paths.append(fire_station_path)
+            if police_station_path:
+                paths.append(police_station_path)
+            self.update_map(paths)
+
+            # Add emergency message for rescue teams
+            self.emergency_message_label.setText("Sending them asap")
 
 class DisasterResponseUI(QMainWindow):
     def __init__(self):
@@ -243,11 +293,11 @@ class DisasterResponseUI(QMainWindow):
         self.stacked_layout.addWidget(self.selection_page)
 
         # Add map page for rescue teams
-        self.map_page = MapPage(self.disaster_graph)
+        self.map_page = MapPage(self.stacked_layout, self.disaster_graph)
         self.stacked_layout.addWidget(self.map_page)
 
         # Add map page for users
-        self.user_map_page = MapPage(self.disaster_graph)
+        self.user_map_page = MapPage(self.stacked_layout, self.disaster_graph)
         self.stacked_layout.addWidget(self.user_map_page)
 
         # Set the layout
