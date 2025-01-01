@@ -28,7 +28,7 @@ class DisasterGraph:
 
         print(f"Graph built with {len(self.graph.nodes)} nodes and {len(self.graph.edges)} edges after simplification and extracting the largest component.")
         
-    def load_emergency_services(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\emergency_services.csv'):
+    def load_emergency_services(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\emergency_services.csv'):
         """Load emergency services into graph"""
         services_df = pd.read_csv(filename)
         
@@ -51,7 +51,7 @@ class DisasterGraph:
             except Exception as e:
                 print(f"Error loading service {row['name']}: {e}")
         
-    def load_shelters(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\shelters.csv'):
+    def load_shelters(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\shelters.csv'):
         """Load shelter locations into graph"""
         shelters_df = pd.read_csv(filename)
         

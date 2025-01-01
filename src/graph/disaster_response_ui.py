@@ -11,6 +11,11 @@ import io
 from graph_structure import DisasterGraph  # Import the DisasterGraph class
 from a_star_pathfinding import PathFinder, find_nearest_service  # Correctly import PathFinder and find_nearest_service
 from shelter import find_nearest_shelter 
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QPixmap
+
+
 
 # Custom QWebEnginePage class
 class CustomWebEnginePage(QWebEnginePage):
@@ -50,10 +55,22 @@ class WelcomePage(QWidget):
     def initUI(self):
         layout = QVBoxLayout()
 
+        # Background label
+        self.background_label = QLabel(self)
+        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\rescue.png") 
+        if pixmap.isNull():
+            print("Failed to load image.") 
+        self.background_label.setPixmap(pixmap)
+        self.background_label.setScaledContents(True)
+        self.background_label.resize(self.size())  # Resize the background to match the window
+        self.background_label.setGeometry(self.rect())
+        self.background_label.lower()
+
         # System name label
         system_name = QLabel("Disaster Response System")
         system_name.setFont(QFont("Arial", 28, QFont.Weight.Bold))
         system_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        system_name.setStyleSheet("color: white;")
         layout.addWidget(system_name)
 
         # Start button
@@ -63,21 +80,16 @@ class WelcomePage(QWidget):
         start_button.clicked.connect(self.on_start_button_clicked)
         layout.addWidget(start_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Close button
-        close_button = QPushButton("Close")
-        close_button.setFont(QFont("Arial", 18))
-        close_button.setStyleSheet("background-color: red; color: white; padding: 20px 40px;")
-        close_button.clicked.connect(self.on_close_button_clicked)
-        layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignCenter)
-
         self.setLayout(layout)
+
+    def resizeEvent(self, event):
+        """Update background label size on window resize."""
+        self.background_label.setGeometry(self.rect())
+        super().resizeEvent(event)
 
     def on_start_button_clicked(self):
         self.stacked_layout.setCurrentIndex(1)
-
-    def on_close_button_clicked(self):
-        QApplication.instance().quit()
-
+    
 class SelectionPage(QWidget):
     def __init__(self, stacked_layout, main_window, parent=None):
         super().__init__(parent)
@@ -88,10 +100,22 @@ class SelectionPage(QWidget):
     def initUI(self):
         layout = QVBoxLayout()
 
+        # Background label
+        self.background_label = QLabel(self)
+        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\2.png") 
+        if pixmap.isNull():
+            print("Failed to load image.") 
+        self.background_label.setPixmap(pixmap)
+        self.background_label.setScaledContents(True)
+        self.background_label.resize(self.size())  # Resize the background to match the window
+        self.background_label.setGeometry(self.rect())
+        self.background_label.lower()
+
         # Selection label
-        selection_label = QLabel("Select Your Role")
+        selection_label = QLabel("You're using the app as a")
         selection_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        selection_label.setStyleSheet("color: white;")
         layout.addWidget(selection_label)
 
         # Rescue team button
@@ -117,20 +141,24 @@ class SelectionPage(QWidget):
 
         self.setLayout(layout)
 
+    def resizeEvent(self, event):
+        """Update background label size on window resize."""
+        self.background_label.setGeometry(self.rect())
+        super().resizeEvent(event)
+
     def on_rescue_button_clicked(self):
         self.stacked_layout.setCurrentIndex(2)
-        # Hardcoded disaster zone coordinates for rescue teams
         disaster_lat, disaster_lon = 24.8700, 67.0200
         self.main_window.map_page.update_disaster_info(disaster_lat, disaster_lon)
 
     def on_victim_button_clicked(self):
         self.stacked_layout.setCurrentIndex(3)
-        # Hardcoded disaster zone coordinates for affected victims
         disaster_lat, disaster_lon = 24.8700, 67.0200
         self.main_window.user_map_page.update_disaster_info(disaster_lat, disaster_lon, role='victim')
 
     def on_back_button_clicked(self):
         self.stacked_layout.setCurrentIndex(0)
+
 
 class MapPage(QWidget):
     coordinatesUpdated = pyqtSignal(str)
@@ -147,12 +175,9 @@ class MapPage(QWidget):
 
         # Create a QWebEngineView to display the map
         self.map_view = QWebEngineView()
-        
-        # Attach our custom QWebEnginePage to intercept the "info://" links
         self.page = CustomWebEnginePage(self.map_view)
-        self.page.linkClicked.connect(self.on_link_clicked)  # Connect the signal
+        self.page.linkClicked.connect(self.on_link_clicked)
         self.map_view.setPage(self.page)
-
         layout.addWidget(self.map_view)
 
         # Create a side panel
@@ -174,11 +199,20 @@ class MapPage(QWidget):
         self.nearest_services_label.setStyleSheet("color: #333; padding: 10px;")
         self.side_panel_layout.addWidget(self.nearest_services_label)
 
-        # Add a label for the emergency message
+        # Create a label for the emergency message
         self.emergency_message_label = QLabel("")
         self.emergency_message_label.setFont(QFont("Arial", 14))
         self.emergency_message_label.setStyleSheet("color: red; padding: 10px;")
         self.side_panel_layout.addWidget(self.emergency_message_label)
+
+        # Add a call button
+        self.call_button = QPushButton()
+        self.call_button.setFont(QFont("Arial", 14))
+        self.call_button.setStyleSheet("background-color: #28a745; color: white; padding: 10px;")
+        self.call_button.setIcon(QIcon("C:/Users/B.J COMP/Documents/3rd SEM/AI Project/Intelligent_Disaster_Response/src/graph/image.png"))
+        self.call_button.setIconSize(QSize(40, 40))  # Correct usage of QSize
+        self.call_button.setText("Call for Help")
+
 
         # Back button
         back_button = QPushButton("Back")
@@ -188,13 +222,11 @@ class MapPage(QWidget):
         self.side_panel_layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(self.side_panel)
-
         self.setLayout(layout)
         self.update_map()
 
     def on_back_button_clicked(self):
         self.stacked_layout.setCurrentIndex(1)
-
     def update_map(self, paths=None):
     # Generate the map
         m = folium.Map(location=[24.8700, 67.0200], zoom_start=13)  # Updated coordinates
