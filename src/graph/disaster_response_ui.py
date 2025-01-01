@@ -4,11 +4,10 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebChannel import QWebChannel
 import folium
 import io
 from graph_structure import DisasterGraph  # Import the DisasterGraph class
-from a_star_pathfinding import PathFinder, find_nearest_service
+from a_star_pathfinding import PathFinder, find_nearest_service  # Correctly import PathFinder and find_nearest_service
 
 class WelcomePage(QWidget):
     def __init__(self, stacked_layout, parent=None):
@@ -115,7 +114,7 @@ class MapPage(QWidget):
         self.setLayout(layout)
         self.update_map()
 
-    def update_map(self):
+    def update_map(self, paths=None):
         # Generate the map
         m = folium.Map(location=[24.8607, 67.0011], zoom_start=13)
 
@@ -148,6 +147,11 @@ class MapPage(QWidget):
             circle.add_child(folium.Popup(f"Coordinates: {lat}, {lon}"))
             circle.add_to(m)
 
+        # Draw paths if provided
+        if paths:
+            for path in paths:
+                folium.PolyLine(path, color="blue", weight=2.5, opacity=1).add_to(m)
+
         # Save the map to a temporary HTML file
         data = io.BytesIO()
         m.save(data, close_file=False)
@@ -164,11 +168,32 @@ class MapPage(QWidget):
         fire_station_path, fire_station_distance, fire_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'fire_station')
         police_station_path, police_station_distance, police_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'police_station')
 
+        # Handle cases where no path is found
+        if hospital_distance is None:
+            hospital_distance = float('inf')
+            hospital_name = "No path found"
+        if fire_station_distance is None:
+            fire_station_distance = float('inf')
+            fire_station_name = "No path found"
+        if police_station_distance is None:
+            police_station_distance = float('inf')
+            police_station_name = "No path found"
+
         # Update the nearest services label
         nearest_services_text = f"Nearest Hospital: {hospital_name} ({hospital_distance/1000:.2f} km)\n"
         nearest_services_text += f"Nearest Fire Station: {fire_station_name} ({fire_station_distance/1000:.2f} km)\n"
         nearest_services_text += f"Nearest Police Station: {police_station_name} ({police_station_distance/1000:.2f} km)"
         self.nearest_services_label.setText(nearest_services_text)
+
+        # Update the map with paths
+        paths = []
+        if hospital_path:
+            paths.append(hospital_path)
+        if fire_station_path:
+            paths.append(fire_station_path)
+        if police_station_path:
+            paths.append(police_station_path)
+        self.update_map(paths)
 
 class DisasterResponseUI(QMainWindow):
     def __init__(self):
@@ -211,7 +236,7 @@ class DisasterResponseUI(QMainWindow):
         self.setCentralWidget(container)
 
         # Hardcoded disaster zone coordinates
-        disaster_lat, disaster_lon = 24.8607, 67.0011
+        disaster_lat, disaster_lon = 24.8750, 67.0100
         self.map_page.update_disaster_info(disaster_lat, disaster_lon)
 
 def main():
