@@ -7,7 +7,7 @@ import math
 
 class DisasterGraph:
     def __init__(self):
-        self.graph = nx.Graph()
+        self.graph = nx.MultiDiGraph()
         self.emergency_services = {}  # Stores emergency service nodes
         self.shelters = {}           # Stores shelter nodes
         self.danger_zones = set()    # Stores current danger zones
@@ -19,13 +19,13 @@ class DisasterGraph:
         self.graph = ox.graph_from_place(place_name, network_type='drive')
         self.graph = ox.distance.add_edge_lengths(self.graph)  # Add edge lengths in meters
         
-    def load_emergency_services(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\emergency_services.csv'):
+    def load_emergency_services(self, filename=r'F:\AI\Project\Disaster-Response-System\data\cached_networks\emergency_services.csv'):
         """Load emergency services into graph"""
         services_df = pd.read_csv(filename)
         
         for _, row in services_df.iterrows():
             # Find nearest node in road network
-            nearest_node = ox.nearest_nodes(
+            nearest_node = ox.distance.nearest_nodes(
                 self.graph, 
                 row['longitude'], 
                 row['latitude']
@@ -38,12 +38,12 @@ class DisasterGraph:
                 'location': (row['latitude'], row['longitude'])
             }
             
-    def load_shelters(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\shelters.csv'):
+    def load_shelters(self, filename=r'F:\AI\Project\Disaster-Response-System\data\cached_networks\shelters.csv'):
         """Load shelter locations into graph"""
         shelters_df = pd.read_csv(filename)
         
         for _, row in shelters_df.iterrows():
-            nearest_node = ox.nearest_nodes(
+            nearest_node = ox.distance.nearest_nodes(
                 self.graph, 
                 row['longitude'], 
                 row['latitude']
@@ -86,8 +86,8 @@ class DisasterGraph:
     def find_safe_path(self, start_lat, start_lon, end_lat, end_lon):
         """Find safest path between two points"""
         # Get nearest nodes to start and end points
-        start_node = ox.nearest_nodes(self.graph, start_lon, start_lat)
-        end_node = ox.nearest_nodes(self.graph, end_lon, end_lat)
+        start_node = ox.distance.nearest_nodes(self.graph, start_lon, start_lat)
+        end_node = ox.distance.nearest_nodes(self.graph, end_lon, end_lat)
 
         # Create a copy of graph with updated weights
         weighted_graph = self.graph.copy()
@@ -107,7 +107,7 @@ class DisasterGraph:
     def visualize_graph(self, save_path="test_path.html"):
         """Visualize the graph with emergency services, shelters, and disaster zones"""
         # Create a map centered around Karachi
-        m = folium.Map(location=[24.8607, 67.0011], zoom_start=13)
+        m = folium.Map(location=[24.8700, 67.0200], zoom_start=13)
         
         # Add emergency services to the map
         for node, data in self.emergency_services.items():
@@ -142,4 +142,4 @@ class DisasterGraph:
     
     def find_closest_node(self, lat, lon):
         """Find the closest node in the graph to a given latitude and longitude"""
-        return ox.nearest_nodes(self.graph, lon, lat)
+        return ox.distance.nearest_nodes(self.graph, lon, lat)
