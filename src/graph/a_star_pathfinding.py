@@ -30,7 +30,7 @@ class PathFinder:
         """
         Calculate the Euclidean distance as the heuristic.
         """
-        coord_a = (self.graph.nodes[node_a]['y'], self.graph.nodes[node_a]['x'])
+        coord_a = (self.graph.nodes[node_a]['y'], self.graph.nodes[node_b]['x'])
         coord_b = (self.graph.nodes[node_b]['y'], self.graph.nodes[node_b]['x'])
         return sqrt((coord_a[0] - coord_b[0])**2 + (coord_a[1] - coord_b[1])**2)
 
