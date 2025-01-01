@@ -1,8 +1,8 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QPushButton, QLabel, QStackedLayout, QHBoxLayout, QFrame)
-from PyQt6.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSlot, QObject, pyqtSignal, QEvent
+from PyQt6.QtGui import QFont, QPixmap
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 import folium
 import osmnx as ox
@@ -12,27 +12,55 @@ from a_star_pathfinding import PathFinder, find_nearest_service  # Correctly imp
 
 class WelcomePage(QWidget):
     def __init__(self, stacked_layout, parent=None):
-        super().__init__(parent)
+        super().__init__(parent)  # Initialize the QWidget with the parent
         self.stacked_layout = stacked_layout
         self.initUI()
 
     def initUI(self):
-        layout = QVBoxLayout()
+        # Create the main layout for the page
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+
+        # Background label
+        self.background_label = QLabel(self)  # Make it an instance variable to update later
+        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\rescue.png")
+        if pixmap.isNull():
+            print("Failed to load image.")
+        self.background_pixmap = pixmap  # Store the pixmap for resizing
+        self.background_label.setPixmap(self.background_pixmap)
+        self.background_label.setScaledContents(True)  # Ensure the image scales to fit the widget
+        self.background_label.setGeometry(self.rect())  # Make the background span the full size of the widget
 
         # System name label
-        system_name = QLabel("Disaster Response System")
+        system_name = QLabel("Disaster Response System", self)
         system_name.setFont(QFont("Arial", 28, QFont.Weight.Bold))
         system_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(system_name)
+        system_name.setStyleSheet("color: white;")  # Ensure text is visible over the image
 
         # Start button
-        start_button = QPushButton("Start")
+        start_button = QPushButton("Start", self)
         start_button.setFont(QFont("Arial", 18))
         start_button.setStyleSheet("background-color: green; color: white; padding: 20px 40px;")
         start_button.clicked.connect(self.on_start_button_clicked)
+
+        # Add the widgets to the layout
+        layout.addWidget(system_name, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(start_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # Ensure the background stays behind other widgets
+        self.background_label.lower()
+
+        # Set the layout
         self.setLayout(layout)
+
+        # Install event filter to handle resizing
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Resize:  # Handle window resizing
+            self.background_label.resize(self.size())
+            self.background_label.setPixmap(self.background_pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding))
+        return super().eventFilter(obj, event)
 
     def on_start_button_clicked(self):
         self.stacked_layout.setCurrentIndex(1)
@@ -285,7 +313,7 @@ class DisasterResponseUI(QMainWindow):
         self.disaster_graph.add_danger_zone(24.8750, 67.0100, 300)  # 300m radius
 
         # Add welcome page
-        self.welcome_page = WelcomePage(self.stacked_layout)
+        self.welcome_page = WelcomePage(self.stacked_layout, self)  # Pass the parent widget
         self.stacked_layout.addWidget(self.welcome_page)
 
         # Add selection page
