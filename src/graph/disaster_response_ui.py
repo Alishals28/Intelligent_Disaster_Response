@@ -328,8 +328,8 @@ class DisasterResponseUI(QMainWindow):
 
         # Add some sample danger zones
         self.disaster_graph.add_danger_zone(24.8700, 67.0200, 200)  # Updated coordinates
-        self.disaster_graph.add_danger_zone(24.8700, 67.0200, 150)  # Updated coordinates
-        self.disaster_graph.add_danger_zone(24.8750, 67.0100, 300)
+        self.disaster_graph.add_danger_zone(24.8725, 67.0200, 150)  # Updated coordinates
+        self.disaster_graph.add_danger_zone(24.8750, 67.0100, 300)  # Updated coordinates
 
         # Add welcome page
         self.welcome_page = WelcomePage(self.stacked_layout)
