@@ -10,6 +10,7 @@ import osmnx as ox
 import io
 from graph_structure import DisasterGraph  # Import the DisasterGraph class
 from a_star_pathfinding import PathFinder, find_nearest_service  # Correctly import PathFinder and find_nearest_service
+from shelter import find_nearest_shelter 
 
 # Custom QWebEnginePage class
 class CustomWebEnginePage(QWebEnginePage):
@@ -195,10 +196,10 @@ class MapPage(QWidget):
         self.stacked_layout.setCurrentIndex(1)
 
     def update_map(self, paths=None):
-        # Generate the map
+    # Generate the map
         m = folium.Map(location=[24.8700, 67.0200], zoom_start=13)  # Updated coordinates
 
-        # Add emergency services to the map
+    # Add emergency services to the map
         for node, data in self.disaster_graph.emergency_services.items():
             folium.Marker(
                 location=data['location'],
@@ -206,7 +207,7 @@ class MapPage(QWidget):
                 icon=folium.Icon(color='red', icon='info-sign')
             ).add_to(m)
 
-        # Add shelters to the map
+    # Add shelters to the map
         for node, data in self.disaster_graph.shelters.items():
             folium.Marker(
                 location=data['location'],
@@ -214,7 +215,7 @@ class MapPage(QWidget):
                 icon=folium.Icon(color='green', icon='home')
             ).add_to(m)
 
-        # Add danger zones to the map with clickable links
+    # Add danger zones to the map with clickable links
         for lat, lon, radius in self.disaster_graph.danger_zones:
             circle = folium.Circle(
                 location=(lat, lon),
@@ -225,7 +226,7 @@ class MapPage(QWidget):
                 fill_opacity=0.5
             )
 
-            # Replace the default popup with a clickable link that triggers side-panel update
+        # Replace the default popup with a clickable link that triggers side-panel update
             popup_html = (
                 f'<a href="info://?lat={lat}&lon={lon}&radius={radius}" '
                 f'style="text-decoration:none;">'
@@ -234,86 +235,64 @@ class MapPage(QWidget):
             circle.add_child(folium.Popup(popup_html))
             circle.add_to(m)
 
-        # Draw paths if provided
+    # Draw paths if provided
         if paths:
             for path in paths:
-                folium.PolyLine(path, color="blue", weight=2.5, opacity=1).add_to(m)
+                if path:  # Ensure the path is not empty
+                    folium.PolyLine(path, color="blue", weight=2.5, opacity=1).add_to(m)
+                else:
+                    print("Warning: Encountered an empty path, skipping.")
 
-        # Save the map to a temporary HTML file
+    # Save the map to a temporary HTML file
         data = io.BytesIO()
         m.save(data, close_file=False)
         self.map_view.setHtml(data.getvalue().decode())
 
+
     def update_disaster_info(self, lat, lon, role=None):
-        coordinates = f"{lat}, {lon}"
-        current_text = self.coordinates_label.text()
-        new_text = current_text + "\n" + coordinates
-        self.coordinates_label.setText(new_text)
+        # Update the disaster coordinates label
+        coordinates = f"Disaster Coordinates: {lat}, {lon}"
+        self.coordinates_label.setText(coordinates)
 
         if role == 'victim':
-            # Hardcoded nearest shelter coordinates
-            nearest_shelter_lat, nearest_shelter_lon = 24.8617, 67.0021
-            nearest_shelter_distance = self.pathfinder.haversine_distance(lat, lon, nearest_shelter_lat, nearest_shelter_lon)
-            nearest_services_text = f"Nearest Shelter: Shelter A ({nearest_shelter_distance/1000:.2f} km)"
-            self.nearest_services_label.setText(nearest_services_text)
-            self.emergency_message_label.setText("Calling and sending them immediately")
+            # Find the nearest shelter dynamically
+            shelter_path, shelter_distance, shelter_name = find_nearest_shelter(
+                self.disaster_graph, self.pathfinder, lat, lon
+            )
 
-            # Update the map with the nearest shelter path
-            start_node = ox.distance.nearest_nodes(self.disaster_graph.graph, lon, lat)
-            goal_node = ox.distance.nearest_nodes(self.disaster_graph.graph, nearest_shelter_lon, nearest_shelter_lat)
-            path = self.pathfinder.a_star(start_node, goal_node)
-            if path:
-                path_coords = self.pathfinder.get_path_coordinates(path)
+            if shelter_path:
+                self.nearest_services_label.setText(
+                    f"Nearest Shelter: {shelter_name} ({shelter_distance / 1000:.2f} km)"
+                )
+                path_coords = self.pathfinder.get_path_coordinates(shelter_path)
                 self.update_map([path_coords])
             else:
+                self.nearest_services_label.setText("No shelter found.")
                 self.update_map()
 
+            self.emergency_message_label.setText("Shelter notified, help is on the way.")
+
         else:
-            # Hardcoded nearest services coordinates
-            nearest_hospital_lat, nearest_hospital_lon = 24.8607, 67.0011
-            nearest_fire_station_lat, nearest_fire_station_lon = 24.8617, 67.0021
-            nearest_police_station_lat, nearest_police_station_lon = 24.8627, 67.0031
-
-            # Calculate distances
-            hospital_distance = self.pathfinder.haversine_distance(lat, lon, nearest_hospital_lat, nearest_hospital_lon)
-            fire_station_distance = self.pathfinder.haversine_distance(lat, lon, nearest_fire_station_lat, nearest_fire_station_lon)
-            police_station_distance = self.pathfinder.haversine_distance(lat, lon, nearest_police_station_lat, nearest_police_station_lon)
-
-            # Update the nearest services label
-            nearest_services_text = f"Nearest Hospital: Hospital A ({hospital_distance/1000:.2f} km)\n"
-            nearest_services_text += f"Nearest Fire Station: Fire Station B ({fire_station_distance/1000:.2f} km)\n"
-            nearest_services_text += f"Nearest Police Station: Police Station C ({police_station_distance/1000:.2f} km)"
-            self.nearest_services_label.setText(nearest_services_text)
-
-            # Update the map with paths
+            # Find the nearest hospital, fire station, and police station dynamically
+            services = ['hospital', 'fire_station', 'police_station']
             paths = []
+            nearest_services_text = ""
 
-            # Path to nearest hospital
-            start_node = ox.distance.nearest_nodes(self.disaster_graph.graph, lon, lat)
-            goal_node = ox.distance.nearest_nodes(self.disaster_graph.graph, nearest_hospital_lon, nearest_hospital_lat)
-            hospital_path = self.pathfinder.a_star(start_node, goal_node)
-            if hospital_path:
-                hospital_path_coords = self.pathfinder.get_path_coordinates(hospital_path)
-                paths.append(hospital_path_coords)
+            for service_type in services:
+                service_path, service_distance, service_name = find_nearest_service(
+                    self.disaster_graph, self.pathfinder, lat, lon, service_type
+                )
+                if service_path:
+                    paths.append(self.pathfinder.get_path_coordinates(service_path))
+                    nearest_services_text += f"Nearest {service_type.capitalize()}: {service_name} ({service_distance / 1000:.2f} km)\n"
+                else:
+                    nearest_services_text += f"No {service_type} found.\n"
 
-            # Path to nearest fire station
-            goal_node = ox.distance.nearest_nodes(self.disaster_graph.graph, nearest_fire_station_lon, nearest_fire_station_lat)
-            fire_station_path = self.pathfinder.a_star(start_node, goal_node)
-            if fire_station_path:
-                fire_station_path_coords = self.pathfinder.get_path_coordinates(fire_station_path)
-                paths.append(fire_station_path_coords)
-
-            # Path to nearest police station
-            goal_node = ox.distance.nearest_nodes(self.disaster_graph.graph, nearest_police_station_lon, nearest_police_station_lat)
-            police_station_path = self.pathfinder.a_star(start_node, goal_node)
-            if police_station_path:
-                police_station_path_coords = self.pathfinder.get_path_coordinates(police_station_path)
-                paths.append(police_station_path_coords)
-
+            self.nearest_services_label.setText(nearest_services_text.strip())
             self.update_map(paths)
 
-            # Add emergency message for rescue teams
-            self.emergency_message_label.setText("Sending them asap")
+            self.emergency_message_label.setText("Rescue teams dispatched to the location.")
+
 
     @pyqtSlot(dict)
     def on_link_clicked(self, info_dict):

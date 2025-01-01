@@ -8,7 +8,7 @@ class PathFinder:
     def __init__(self, disaster_graph):
         self.graph = disaster_graph.graph
         self.emergency_services = disaster_graph.emergency_services
-        
+
     def haversine_distance(self, lat1, lon1, lat2, lon2):
         """
         Calculate the great circle distance between two points 
@@ -30,9 +30,13 @@ class PathFinder:
         """
         Calculate the Euclidean distance as the heuristic.
         """
-        coord_a = (self.graph.nodes[node_a]['y'], self.graph.nodes[node_a]['x'])
-        coord_b = (self.graph.nodes[node_b]['y'], self.graph.nodes[node_b]['x'])
-        return sqrt((coord_a[0] - coord_b[0])**2 + (coord_a[1] - coord_b[1])**2)
+        try:
+            coord_a = (self.graph.nodes[node_a]['y'], self.graph.nodes[node_a]['x'])
+            coord_b = (self.graph.nodes[node_b]['y'], self.graph.nodes[node_b]['x'])
+            return sqrt((coord_a[0] - coord_b[0])**2 + (coord_a[1] - coord_b[1])**2)
+        except KeyError as e:
+            print(f"Error in heuristic calculation: {e}")
+            return float('inf')
 
     def a_star(self, start, goal):
         """
@@ -68,14 +72,19 @@ class PathFinder:
                 return path
 
             for neighbor in self.graph.neighbors(current):
-                tentative_g_score = g_score[current] + self.graph.edges[current, neighbor, 0]['length']
+                try:
+                    edge_length = self.graph.edges[current, neighbor, 0]['length']
+                    tentative_g_score = g_score[current] + edge_length
 
-                if tentative_g_score < g_score[neighbor]:
-                    came_from[neighbor] = current
-                    g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = g_score[neighbor] + self.heuristic(neighbor, goal)
-                    heappush(open_set, (f_score[neighbor], neighbor))
+                    if tentative_g_score < g_score[neighbor]:
+                        came_from[neighbor] = current
+                        g_score[neighbor] = tentative_g_score
+                        f_score[neighbor] = g_score[neighbor] + self.heuristic(neighbor, goal)
+                        heappush(open_set, (f_score[neighbor], neighbor))
+                except KeyError as e:
+                    print(f"Error accessing edge data: {e}")
 
+        print(f"No path found from {start} to {goal}.")
         return None
 
     def get_path_coordinates(self, path):
@@ -84,9 +93,14 @@ class PathFinder:
         """
         if not path:
             return []
-            
-        return [(self.graph.nodes[node]['y'], self.graph.nodes[node]['x']) 
-                for node in path]
+        
+        coords = []
+        for node in path:
+            if node in self.graph.nodes:
+                coords.append((self.graph.nodes[node]['y'], self.graph.nodes[node]['x']))
+            else:
+                print(f"Warning: Node {node} not found in the graph.")
+        return coords
 
     def calculate_path_distance(self, path):
         """
@@ -99,7 +113,10 @@ class PathFinder:
         for i in range(len(path) - 1):
             node_a = path[i]
             node_b = path[i + 1]
-            total_distance += self.graph.edges[node_a, node_b, 0]['length']
+            try:
+                total_distance += self.graph.edges[node_a, node_b, 0]['length']
+            except KeyError as e:
+                print(f"Error accessing edge data: {e}")
         
         return total_distance
 

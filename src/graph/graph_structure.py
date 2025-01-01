@@ -15,45 +15,62 @@ class DisasterGraph:
         
     def build_from_osm(self, place_name):
         """Build graph from OpenStreetMap data"""
-        # Get road network
-        self.graph = ox.graph_from_place(place_name, network_type='drive')
+        # Get road network and specify not to simplify
+        self.graph = ox.graph_from_place(place_name, network_type='drive', simplify=False)
         self.graph = ox.distance.add_edge_lengths(self.graph)  # Add edge lengths in meters
+
+        # Simplify the graph to remove unnecessary complexity
+        self.graph = ox.simplify_graph(self.graph)
+
+        # Extract the largest connected component
+        largest_component = max(nx.strongly_connected_components(self.graph), key=len)
+        self.graph = self.graph.subgraph(largest_component).copy()
+
+        print(f"Graph built with {len(self.graph.nodes)} nodes and {len(self.graph.edges)} edges after simplification and extracting the largest component.")
         
-    def load_emergency_services(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\emergency_services.csv'):
+    def load_emergency_services(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\emergency_services.csv'):
         """Load emergency services into graph"""
         services_df = pd.read_csv(filename)
         
         for _, row in services_df.iterrows():
-            # Find nearest node in road network
-            nearest_node = ox.distance.nearest_nodes(
-                self.graph, 
-                row['longitude'], 
-                row['latitude']
-            )
-            
-            # Store with type information
-            self.emergency_services[nearest_node] = {
-                'name': row['name'],
-                'type': row['type'],
-                'location': (row['latitude'], row['longitude'])
-            }
-            
-    def load_shelters(self, filename=r'F:\AI\Project\Disaster-Response-System\src\graph\shelters.csv'):
+            try:
+                # Find nearest node in road network
+                nearest_node = ox.distance.nearest_nodes(
+                    self.graph, 
+                    row['longitude'], 
+                    row['latitude']
+                )
+                
+                # Store with type information
+                self.emergency_services[nearest_node] = {
+                    'name': row['name'],
+                    'type': row['type'],
+                    'location': (row['latitude'], row['longitude'])
+                }
+                print(f"Loaded service: {row['name']} ({row['type']}) at node {nearest_node}")
+            except Exception as e:
+                print(f"Error loading service {row['name']}: {e}")
+        
+    def load_shelters(self, filename=r'C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\shelters.csv'):
         """Load shelter locations into graph"""
         shelters_df = pd.read_csv(filename)
         
         for _, row in shelters_df.iterrows():
-            nearest_node = ox.distance.nearest_nodes(
-                self.graph, 
-                row['longitude'], 
-                row['latitude']
-            )
-            
-            self.shelters[nearest_node] = {
-                'name': row['name'],
-                'capacity': row['capacity'],
-                'location': (row['latitude'], row['longitude'])
-            }
+            try:
+                nearest_node = ox.distance.nearest_nodes(
+                    self.graph, 
+                    row['longitude'], 
+                    row['latitude']
+                )
+                
+                self.shelters[nearest_node] = {
+                    'name': row['name'],
+                    'capacity': row['capacity'],
+                    'location': (row['latitude'], row['longitude'])
+                }
+                print(f"Loaded shelter: {row['name']} at node {nearest_node}")
+            except Exception as e:
+                print(f"Error loading shelter {row['name']}: {e}")
     
     def add_danger_zone(self, lat, lon, radius):
         """
@@ -89,17 +106,28 @@ class DisasterGraph:
         start_node = ox.distance.nearest_nodes(self.graph, start_lon, start_lat)
         end_node = ox.distance.nearest_nodes(self.graph, end_lon, end_lat)
 
-        # Create a copy of graph with updated weights
-        weighted_graph = self.graph.copy()
-        edge_weights = {edge: self.weights[(edge[0], edge[1])] for edge in weighted_graph.edges}
-        nx.set_edge_attributes(weighted_graph, edge_weights, 'weight')
+        # Check connectivity before pathfinding
+        if not self.check_node_connectivity(start_node, end_node):
+            print(f"No path found: Nodes {start_node} and {end_node} are not connected.")
+            return None
 
         try:
-            path = nx.shortest_path(weighted_graph, start_node, end_node, weight='weight')
+            path = nx.shortest_path(self.graph, start_node, end_node, weight='length')
+            print(f"Path found: {path}")
             return path
         except nx.NetworkXNoPath:
+            print("No safe path found!")
             return None
-    
+
+    def check_node_connectivity(self, node1, node2):
+        """Check if two nodes belong to the same connected component"""
+        if nx.has_path(self.graph, node1, node2):
+            print(f"Nodes {node1} and {node2} are connected.")
+            return True
+        else:
+            print(f"Nodes {node1} and {node2} are NOT connected.")
+            return False
+
     def get_number_of_danger_zones(self):
         """Return the number of danger zones"""
         return len(self.danger_zones)
@@ -143,3 +171,13 @@ class DisasterGraph:
     def find_closest_node(self, lat, lon):
         """Find the closest node in the graph to a given latitude and longitude"""
         return ox.distance.nearest_nodes(self.graph, lon, lat)
+
+    def get_path_coordinates(self, path):
+        """Convert a path to a list of latitude/longitude tuples"""
+        coords = []
+        for node in path:
+            if node in self.graph.nodes:
+                coords.append((self.graph.nodes[node]['y'], self.graph.nodes[node]['x']))
+            else:
+                print(f"Node {node} not found in the graph.")
+        return coords
