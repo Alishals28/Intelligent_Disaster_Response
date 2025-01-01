@@ -128,7 +128,7 @@ def find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zon
     else:
         print(f"No path found to the nearest {service_type}.")
         return None, None, None
-
+    
 def main():
     # Initialize the disaster graph
     disaster_graph = DisasterGraph()
@@ -155,7 +155,7 @@ def main():
         print(f"Nearest fire station: {fire_station_name}")
 
     # Find the nearest police station
-    police_station_path, police_station_distance, police_station_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'police station')
+    police_station_path, police_station_distance, police_station_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'police_station')
     if police_station_path:
         print("Path to nearest police station found!")
         print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
