@@ -40,7 +40,7 @@ This project utilizes graph-based modeling and the A* search algorithm to optimi
 
 1. Run the graph creation script:
    ```bash
-   python src/graph_model.py
+   python src/graph_structure.py
    ```
 2. Integrate the A* algorithm to calculate paths.
 3. Test with simulated scenarios by running:
