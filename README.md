@@ -8,13 +8,9 @@ This project utilizes graph-based modeling and the A* search algorithm to optimi
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Alishals28/Disaster-Response-System.git
+   git clone https://github.com/Alishals28/Intelligent_Disaster_Response
    ```
-2. Navigate to the project directory:
-   ```bash
-   cd Disaster-Response-System
-   ```
-3. Install required Python libraries:
+2. Install required Python libraries:
    ```bash
    pip install 
         networkx 
@@ -22,7 +18,7 @@ This project utilizes graph-based modeling and the A* search algorithm to optimi
         matplotlib 
         numpy 
         folium
-        PyQt5 # for GUI
+        PyQt6 and PyQt6-WebEngine # for GUI
         osmnx # for real-world map data
         scipy # for scientific computing
         haversine # for geographic distance calculations

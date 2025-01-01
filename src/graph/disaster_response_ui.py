@@ -53,7 +53,7 @@ class WelcomePage(QWidget):
 
         # Background label
         self.background_label = QLabel(self)  # Make it an instance variable to update later
-        pixmap = QPixmap(r"F:\AI\Project\Disaster-Response-System\src\graph\rescue.png")
+        pixmap = QPixmap(r'F:\AI\Project\Disaster-Response-System\src\graph\rescue.png')
         if pixmap.isNull():
             print("Failed to load image.")
         self.background_pixmap = pixmap  # Store the pixmap for resizing
