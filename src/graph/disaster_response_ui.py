@@ -7,7 +7,9 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 import folium
 import io
 from graph_structure import DisasterGraph  # Import the DisasterGraph class
-from a_star_pathfinding import PathFinder, find_nearest_service  # Correctly import PathFinder and find_nearest_service
+from shelter import find_nearest_shelter
+from a_star_pathfinding import PathFinder
+
 
 class WelcomePage(QWidget):
     def __init__(self, stacked_layout, parent=None):
@@ -71,8 +73,7 @@ class SelectionPage(QWidget):
         self.stacked_layout.setCurrentIndex(2)
 
     def on_victim_button_clicked(self):
-        print("Affected Victim selected")
-        # Add logic to handle affected victim selection
+        self.stacked_layout.setCurrentIndex(3)
 
 class MapPage(QWidget):
     coordinatesUpdated = pyqtSignal(str)
@@ -157,43 +158,33 @@ class MapPage(QWidget):
         m.save(data, close_file=False)
         self.map_view.setHtml(data.getvalue().decode())
 
-    def update_disaster_info(self, lat, lon):
+    def update_disaster_info(self, lat, lon, role):
         coordinates = f"{lat}, {lon}"
         current_text = self.coordinates_label.text()
         new_text = current_text + "\n" + coordinates
         self.coordinates_label.setText(new_text)
 
-        # Find nearest services
-        hospital_path, hospital_distance, hospital_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'hospital')
-        fire_station_path, fire_station_distance, fire_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'fire_station')
-        police_station_path, police_station_distance, police_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'police_station')
+        if role == 'user':
+            # Find nearest shelter for users
+            shelter_path, shelter_distance, shelter_name = find_nearest_shelter(self.disaster_graph, self.pathfinder, lat, lon)
 
-        # Handle cases where no path is found
-        if hospital_distance is None:
-            hospital_distance = float('inf')
-            hospital_name = "No path found"
-        if fire_station_distance is None:
-            fire_station_distance = float('inf')
-            fire_station_name = "No path found"
-        if police_station_distance is None:
-            police_station_distance = float('inf')
-            police_station_name = "No path found"
+            if shelter_distance is None:
+                shelter_distance = float('inf')
+                shelter_name = "No path found"
 
-        # Update the nearest services label
-        nearest_services_text = f"Nearest Hospital: {hospital_name} ({hospital_distance/1000:.2f} km)\n"
-        nearest_services_text += f"Nearest Fire Station: {fire_station_name} ({fire_station_distance/1000:.2f} km)\n"
-        nearest_services_text += f"Nearest Police Station: {police_station_name} ({police_station_distance/1000:.2f} km)"
-        self.nearest_services_label.setText(nearest_services_text)
+            # Update the nearest services label
+            nearest_services_text = f"Nearest Shelter: {shelter_name} ({shelter_distance/1000:.2f} km)"
+            self.nearest_services_label.setText(nearest_services_text)
 
-        # Update the map with paths
-        paths = []
-        if hospital_path:
-            paths.append(hospital_path)
-        if fire_station_path:
-            paths.append(fire_station_path)
-        if police_station_path:
-            paths.append(police_station_path)
-        self.update_map(paths)
+            # Update the map with the path
+            paths = []
+            if shelter_path:
+                paths.append(shelter_path)
+            self.update_map(paths)
+        else:
+            # Default behavior for rescue teams or other roles
+            self.nearest_services_label.setText("")
+            self.update_map()
 
 class DisasterResponseUI(QMainWindow):
     def __init__(self):
@@ -226,18 +217,22 @@ class DisasterResponseUI(QMainWindow):
         self.selection_page = SelectionPage(self.stacked_layout)
         self.stacked_layout.addWidget(self.selection_page)
 
-        # Add map page
+        # Add map page for rescue teams
         self.map_page = MapPage(self.disaster_graph)
         self.stacked_layout.addWidget(self.map_page)
+
+        # Add map page for users
+        self.user_map_page = MapPage(self.disaster_graph)
+        self.stacked_layout.addWidget(self.user_map_page)
 
         # Set the layout
         container = QWidget()
         container.setLayout(self.stacked_layout)
         self.setCentralWidget(container)
 
-        # Hardcoded disaster zone coordinates
+        # Hardcoded disaster zone coordinates for testing
         disaster_lat, disaster_lon = 24.8750, 67.0100
-        self.map_page.update_disaster_info(disaster_lat, disaster_lon)
+        self.user_map_page.update_disaster_info(disaster_lat, disaster_lon, role='user')
 
 def main():
     app = QApplication(sys.argv)
