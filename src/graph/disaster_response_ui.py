@@ -1,12 +1,14 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QPushButton, QLabel, QStackedLayout, QHBoxLayout)
-from PyQt6.QtCore import Qt
+                            QPushButton, QLabel, QStackedLayout, QHBoxLayout, QFrame)
+from PyQt6.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebChannel import QWebChannel
 import folium
 import io
 from graph_structure import DisasterGraph  # Import the DisasterGraph class
+from a_star_pathfinding import PathFinder, find_nearest_service
 
 class WelcomePage(QWidget):
     def __init__(self, stacked_layout, parent=None):
@@ -74,17 +76,41 @@ class SelectionPage(QWidget):
         # Add logic to handle affected victim selection
 
 class MapPage(QWidget):
+    coordinatesUpdated = pyqtSignal(str)
+
     def __init__(self, disaster_graph, parent=None):
         super().__init__(parent)
         self.disaster_graph = disaster_graph
+        self.pathfinder = PathFinder(disaster_graph)
         self.initUI()
 
     def initUI(self):
-        layout = QVBoxLayout()
+        layout = QHBoxLayout()
 
         # Create a QWebEngineView to display the map
         self.map_view = QWebEngineView()
         layout.addWidget(self.map_view)
+
+        # Create a side panel
+        self.side_panel = QFrame()
+        self.side_panel.setFrameShape(QFrame.Shape.StyledPanel)
+        self.side_panel.setStyleSheet("background-color: #f0f0f0; border: 1px solid #ccc;")
+        self.side_panel_layout = QVBoxLayout()
+        self.side_panel.setLayout(self.side_panel_layout)
+
+        # Add a label to display coordinates
+        self.coordinates_label = QLabel("Disaster Coordinates:")
+        self.coordinates_label.setFont(QFont("Arial", 16))
+        self.coordinates_label.setStyleSheet("color: #333; padding: 10px;")
+        self.side_panel_layout.addWidget(self.coordinates_label)
+
+        # Add labels for nearest services
+        self.nearest_services_label = QLabel("")
+        self.nearest_services_label.setFont(QFont("Arial", 14))
+        self.nearest_services_label.setStyleSheet("color: #333; padding: 10px;")
+        self.side_panel_layout.addWidget(self.nearest_services_label)
+
+        layout.addWidget(self.side_panel)
 
         self.setLayout(layout)
         self.update_map()
@@ -109,21 +135,40 @@ class MapPage(QWidget):
                 icon=folium.Icon(color='green', icon='home')
             ).add_to(m)
 
-        # Add danger zones to the map as semi-transparent red circles
+        # Add danger zones to the map with click handlers
         for lat, lon, radius in self.disaster_graph.danger_zones:
-            folium.Circle(
+            circle = folium.Circle(
                 location=(lat, lon),
                 radius=radius,  # Adjust the radius as needed
                 color='red',
                 fill=True,
                 fill_color='red',
                 fill_opacity=0.5  # Semi-transparent
-            ).add_to(m)
+            )
+            circle.add_child(folium.Popup(f"Coordinates: {lat}, {lon}"))
+            circle.add_to(m)
 
         # Save the map to a temporary HTML file
         data = io.BytesIO()
         m.save(data, close_file=False)
         self.map_view.setHtml(data.getvalue().decode())
+
+    def update_disaster_info(self, lat, lon):
+        coordinates = f"{lat}, {lon}"
+        current_text = self.coordinates_label.text()
+        new_text = current_text + "\n" + coordinates
+        self.coordinates_label.setText(new_text)
+
+        # Find nearest services
+        hospital_path, hospital_distance, hospital_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'hospital')
+        fire_station_path, fire_station_distance, fire_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'fire_station')
+        police_station_path, police_station_distance, police_station_name = find_nearest_service(self.disaster_graph, self.pathfinder, lat, lon, 'police_station')
+
+        # Update the nearest services label
+        nearest_services_text = f"Nearest Hospital: {hospital_name} ({hospital_distance/1000:.2f} km)\n"
+        nearest_services_text += f"Nearest Fire Station: {fire_station_name} ({fire_station_distance/1000:.2f} km)\n"
+        nearest_services_text += f"Nearest Police Station: {police_station_name} ({police_station_distance/1000:.2f} km)"
+        self.nearest_services_label.setText(nearest_services_text)
 
 class DisasterResponseUI(QMainWindow):
     def __init__(self):
@@ -132,7 +177,7 @@ class DisasterResponseUI(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle('Disaster Response System')
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 1000, 600)
 
         # Create stacked layout
         self.stacked_layout = QStackedLayout()
@@ -164,6 +209,10 @@ class DisasterResponseUI(QMainWindow):
         container = QWidget()
         container.setLayout(self.stacked_layout)
         self.setCentralWidget(container)
+
+        # Hardcoded disaster zone coordinates
+        disaster_lat, disaster_lon = 24.8607, 67.0011
+        self.map_page.update_disaster_info(disaster_lat, disaster_lon)
 
 def main():
     app = QApplication(sys.argv)
