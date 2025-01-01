@@ -38,8 +38,15 @@ This project utilizes graph-based modeling and the A* search algorithm to optimi
    ```bash
    python src/graph_structure.py
    ```
-2. Integrate the A* algorithm to calculate paths.
-3. Test with simulated scenarios by running:
+2. Run the a* algo script
+   ```bash
+   python src/graph/a_star_pathfinding.py
+   ```
+3. Run the GUI file
+   ```bash
+   python src/graph/disaster_response_ui.py
+   ```
+4. Test with simulated scenarios by running:
    ```bash
    python tests/test_cases.py
    ```
