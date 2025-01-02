@@ -57,7 +57,7 @@ class WelcomePage(QWidget):
 
         # Background label
         self.background_label = QLabel(self)
-        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\rescue.png") 
+        pixmap = QPixmap(r"F:\AI\Project\Disaster-Response-System\src\graph\rescue.png") 
         if pixmap.isNull():
             print("Failed to load image.") 
         self.background_label.setPixmap(pixmap)
@@ -102,7 +102,7 @@ class SelectionPage(QWidget):
 
         # Background label
         self.background_label = QLabel(self)
-        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\2.png") 
+        pixmap = QPixmap(r"F:\AI\Project\Disaster-Response-System\src\graph\2.png") 
         if pixmap.isNull():
             print("Failed to load image.") 
         self.background_label.setPixmap(pixmap)
