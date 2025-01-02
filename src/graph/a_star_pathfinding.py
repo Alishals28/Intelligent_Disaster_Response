@@ -87,6 +87,16 @@ class PathFinder:
         print(f"No path found from {start} to {goal}.")
         return None
 
+    def reconstruct_path(self, came_from, current):
+        """
+        Reconstruct the path from start to end
+        """
+        total_path = [current]
+        while current in came_from:
+            current = came_from[current]
+            total_path.append(current)
+        return total_path[::-1]
+
     def get_path_coordinates(self, path):
         """
         Convert path node IDs to list of coordinates for visualization
@@ -145,3 +155,53 @@ def find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zon
     else:
         print(f"No path found to the nearest {service_type}.")
         return None, None, None
+
+def main():
+    # Initialize the disaster graph
+    disaster_graph = DisasterGraph()
+    disaster_graph.build_from_osm("Saddar, Karachi, Pakistan")
+    disaster_graph.load_emergency_services()
+    disaster_graph.load_shelters()
+
+    # Add a sample danger zone
+    danger_zone_lat, danger_zone_lon = 24.8750, 67.0100
+    disaster_graph.add_danger_zone(danger_zone_lat, danger_zone_lon, 200)  # 200m radius
+
+    # Initialize the pathfinder
+    pathfinder = PathFinder(disaster_graph)
+
+    # Find the nearest police station
+    police_path, police_distance, police_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'police_station')
+    if police_path:
+        print("Path to nearest police station found!")
+        print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
+        print("Path coordinates to police station:")
+        for coord in police_path:
+            print(coord)
+        print(f"Total distance to police station: {police_distance/1000:.2f} km")
+        print(f"Nearest police station: {police_name}")
+
+    # Find the nearest fire station
+    fire_path, fire_distance, fire_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'fire_station')
+    if fire_path:
+        print("Path to nearest fire station found!")
+        print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
+        print("Path coordinates to fire station:")
+        for coord in fire_path:
+            print(coord)
+        print(f"Total distance to fire station: {fire_distance/1000:.2f} km")
+        print(f"Nearest fire station: {fire_name}")
+
+    # Find the nearest hospital
+    hospital_path, hospital_distance, hospital_name = find_nearest_service(disaster_graph, pathfinder, danger_zone_lat, danger_zone_lon, 'hospital')
+    if hospital_path:
+        print("Path to nearest hospital found!")
+        print(f"Disaster Zone: ({danger_zone_lat}, {danger_zone_lon})")
+        print("Path coordinates to hospital:")
+        for coord in hospital_path:
+            print(coord)
+        print(f"Total distance to hospital: {hospital_distance/1000:.2f} km")
+        print(f"Nearest hospital: {hospital_name}")
+
+if __name__ == "__main__":
+    main()

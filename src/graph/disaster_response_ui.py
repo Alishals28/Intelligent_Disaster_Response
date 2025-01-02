@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QPushButton, QLabel, QStackedLayout, QHBoxLayout, QFrame)
+                            QPushButton, QLabel, QStackedLayout, QHBoxLayout, QFrame, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
@@ -16,20 +16,22 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QPixmap
 
 
-
 # Custom QWebEnginePage class
 class CustomWebEnginePage(QWebEnginePage):
-    # This signal is emitted when the user clicks on a specially formatted link in the popup
     linkClicked = pyqtSignal(dict)
+    mapClicked = pyqtSignal(float, float)  # New signal for map clicks
+
+    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
+        if message.startswith("Coordinates:"):
+            try:
+                # Parse coordinates from the message
+                lat, lon = map(float, message.replace("Coordinates:", "").strip().split(","))
+                self.mapClicked.emit(lat, lon)
+            except:
+                print("Error parsing coordinates")
 
     def acceptNavigationRequest(self, url, nav_type, isMainFrame):
-        """
-        Intercepts navigation requests in the QWebEngineView.
-        If the link starts with 'info://', we parse the query parameters 
-        and emit linkClicked instead of navigating.
-        """
         url_str = url.toString()
-        # Check if it's our special link
         if url_str.startswith("info://"):
             from urllib.parse import urlparse, parse_qs
             parsed_url = urlparse(url_str)
@@ -39,9 +41,7 @@ class CustomWebEnginePage(QWebEnginePage):
             lon = float(query.get("lon", [0])[0])
             radius = float(query.get("radius", [0])[0])
 
-            # Emit a signal with the data
             self.linkClicked.emit({"lat": lat, "lon": lon, "radius": radius})
-            # Do NOT navigate to this URL
             return False
 
         return super().acceptNavigationRequest(url, nav_type, isMainFrame)
@@ -57,7 +57,7 @@ class WelcomePage(QWidget):
 
         # Background label
         self.background_label = QLabel(self)
-        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\rescue.png") 
+        pixmap = QPixmap(r"F:\AI\Project\Disaster-Response-System\src\graph\rescue.png") 
         if pixmap.isNull():
             print("Failed to load image.") 
         self.background_label.setPixmap(pixmap)
@@ -68,7 +68,7 @@ class WelcomePage(QWidget):
 
         # System name label
         system_name = QLabel("Disaster Response System")
-        system_name.setFont(QFont("Arial", 28, QFont.Weight.Bold))
+        system_name.setFont(QFont("Arial", 40, QFont.Weight.Bold))
         system_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         system_name.setStyleSheet("color: white;")
         layout.addWidget(system_name)
@@ -102,7 +102,7 @@ class SelectionPage(QWidget):
 
         # Background label
         self.background_label = QLabel(self)
-        pixmap = QPixmap(r"C:\Users\B.J COMP\Documents\3rd SEM\AI Project\Intelligent_Disaster_Response\src\graph\2.png") 
+        pixmap = QPixmap(r"F:\AI\Project\Disaster-Response-System\src\graph\2.png") 
         if pixmap.isNull():
             print("Failed to load image.") 
         self.background_label.setPixmap(pixmap)
@@ -177,6 +177,7 @@ class MapPage(QWidget):
         self.map_view = QWebEngineView()
         self.page = CustomWebEnginePage(self.map_view)
         self.page.linkClicked.connect(self.on_link_clicked)
+        self.page.mapClicked.connect(self.on_map_clicked)  # Connect new signal
         self.map_view.setPage(self.page)
         layout.addWidget(self.map_view)
 
@@ -187,11 +188,28 @@ class MapPage(QWidget):
         self.side_panel_layout = QVBoxLayout()
         self.side_panel.setLayout(self.side_panel_layout)
 
-        # Add a label to display coordinates
+        # Create coordinate input section
+        coord_layout = QHBoxLayout()
         self.coordinates_label = QLabel("Disaster Coordinates:")
         self.coordinates_label.setFont(QFont("Arial", 16))
         self.coordinates_label.setStyleSheet("color: #333; padding: 10px;")
-        self.side_panel_layout.addWidget(self.coordinates_label)
+        coord_layout.addWidget(self.coordinates_label)
+        
+        # Add text box for coordinates
+        self.coord_input = QLineEdit()
+        self.coord_input.setPlaceholderText("lat, lon")
+        self.coord_input.setFont(QFont("Arial", 14))
+        self.coord_input.setStyleSheet("padding: 5px; color: black;")
+        coord_layout.addWidget(self.coord_input)
+        
+        # Add find button
+        find_button = QPushButton("Find Services")
+        find_button.setFont(QFont("Arial", 14))
+        find_button.setStyleSheet("background-color: #007bff; color: white; padding: 5px;")
+        find_button.clicked.connect(self.on_find_button_clicked)
+        coord_layout.addWidget(find_button)
+        
+        self.side_panel_layout.addLayout(coord_layout)
 
         # Add labels for nearest services
         self.nearest_services_label = QLabel("")
@@ -210,9 +228,8 @@ class MapPage(QWidget):
         self.call_button.setFont(QFont("Arial", 14))
         self.call_button.setStyleSheet("background-color: #28a745; color: white; padding: 10px;")
         self.call_button.setIcon(QIcon("C:/Users/B.J COMP/Documents/3rd SEM/AI Project/Intelligent_Disaster_Response/src/graph/image.png"))
-        self.call_button.setIconSize(QSize(40, 40))  # Correct usage of QSize
+        self.call_button.setIconSize(QSize(40, 40))
         self.call_button.setText("Call for Help")
-
 
         # Back button
         back_button = QPushButton("Back")
@@ -221,17 +238,40 @@ class MapPage(QWidget):
         back_button.clicked.connect(self.on_back_button_clicked)
         self.side_panel_layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # Store current coordinates
+        self.current_lat = None
+        self.current_lon = None
+        self.current_role = None
+        
         layout.addWidget(self.side_panel)
         self.setLayout(layout)
         self.update_map()
 
     def on_back_button_clicked(self):
         self.stacked_layout.setCurrentIndex(1)
-    def update_map(self, paths=None):
-    # Generate the map
-        m = folium.Map(location=[24.8700, 67.0200], zoom_start=13)  # Updated coordinates
 
-    # Add emergency services to the map
+    def update_map(self, paths=None):
+        m = folium.Map(location=[24.8700, 67.0200], zoom_start=13)
+
+        # Add click event listener to the map
+        m.add_child(folium.ClickForMarker(popup="Selected Location"))
+        
+        # Add JavaScript to capture clicks
+        m.get_root().html.add_child(folium.Element("""
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() {
+                    var map = document.querySelector('#map');
+                    map.addEventListener('click', function(e) {
+                        var coordinates = e.latlng;
+                        console.log("Coordinates:" + coordinates.lat + "," + coordinates.lng);
+                    });
+                }, 1000);
+            });
+            </script>
+        """))
+
+        # Add emergency services to the map
         for node, data in self.disaster_graph.emergency_services.items():
             folium.Marker(
                 location=data['location'],
@@ -239,7 +279,7 @@ class MapPage(QWidget):
                 icon=folium.Icon(color='red', icon='info-sign')
             ).add_to(m)
 
-    # Add shelters to the map
+        # Add shelters to the map
         for node, data in self.disaster_graph.shelters.items():
             folium.Marker(
                 location=data['location'],
@@ -247,7 +287,7 @@ class MapPage(QWidget):
                 icon=folium.Icon(color='green', icon='home')
             ).add_to(m)
 
-    # Add danger zones to the map with clickable links
+        # Add danger zones to the map
         for lat, lon, radius in self.disaster_graph.danger_zones:
             circle = folium.Circle(
                 location=(lat, lon),
@@ -255,57 +295,54 @@ class MapPage(QWidget):
                 color='red',
                 fill=True,
                 fill_color='red',
-                fill_opacity=0.5
-            )
+                fill_opacity=0.5,
+                popup=f'Coordinates: {lat}, {lon}'
+            ).add_to(m)
 
-        # Replace the default popup with a clickable link that triggers side-panel update
-            popup_html = (
-                f'<a href="info://?lat={lat}&lon={lon}&radius={radius}" '
-                f'style="text-decoration:none;">'
-                f'Coordinates: {lat}, {lon}, Radius: {radius}</a>'
-            )
-            circle.add_child(folium.Popup(popup_html))
-            circle.add_to(m)
-
-    # Draw paths if provided
+        # Draw paths if provided
         if paths:
             for path in paths:
-                if path:  # Ensure the path is not empty
+                if path:
                     folium.PolyLine(path, color="blue", weight=2.5, opacity=1).add_to(m)
-                else:
-                    print("Warning: Encountered an empty path, skipping.")
 
-    # Save the map to a temporary HTML file
         data = io.BytesIO()
         m.save(data, close_file=False)
         self.map_view.setHtml(data.getvalue().decode())
 
+    def on_map_clicked(self, lat, lon):
+        """Handle map click events"""
+        self.coord_input.setText(f"{lat}, {lon}")
+
+    def on_find_button_clicked(self):
+        """Handle find button clicks"""
+        try:
+            lat, lon = map(float, self.coord_input.text().split(","))
+            self.update_disaster_info(lat, lon, self.role if hasattr(self, 'role') else None)
+        except ValueError:
+            self.emergency_message_label.setText("Invalid coordinates! Please use format: lat, lon")
 
     def update_disaster_info(self, lat, lon, role=None):
-        # Update the disaster coordinates label
-        coordinates = f"Disaster Coordinates: {lat}, {lon}"
-        self.coordinates_label.setText(coordinates)
-
+        self.role = role  # Store the role
         if role == 'victim':
-            # Find the nearest shelter dynamically
+            # Find nearest shelter
             shelter_path, shelter_distance, shelter_name = find_nearest_shelter(
                 self.disaster_graph, self.pathfinder, lat, lon
             )
 
             if shelter_path:
                 self.nearest_services_label.setText(
-                    f"Nearest Shelter: {shelter_name} ({shelter_distance / 1000:.2f} km)"
+                    f"Nearest Shelter: {shelter_name}\nDistance: {shelter_distance / 1000:.2f} km"
                 )
-                path_coords = self.pathfinder.get_path_coordinates(shelter_path)
+                path_coords = shelter_path
                 self.update_map([path_coords])
             else:
                 self.nearest_services_label.setText("No shelter found.")
                 self.update_map()
 
-            self.emergency_message_label.setText("Shelter notified, help is on the way.")
+            self.emergency_message_label.setText("Call shelter for assistance.")
 
         else:
-            # Find the nearest hospital, fire station, and police station dynamically
+            # Find nearest emergency services
             services = ['hospital', 'fire_station', 'police_station']
             paths = []
             nearest_services_text = ""
@@ -315,31 +352,24 @@ class MapPage(QWidget):
                     self.disaster_graph, self.pathfinder, lat, lon, service_type
                 )
                 if service_path:
-                    paths.append(self.pathfinder.get_path_coordinates(service_path))
-                    nearest_services_text += f"Nearest {service_type.capitalize()}: {service_name} ({service_distance / 1000:.2f} km)\n"
+                    paths.append(service_path)
+                    nearest_services_text += f"Nearest {service_type.replace('_', ' ').title()}:\n"
+                    nearest_services_text += f"Name: {service_name}\n"
+                    nearest_services_text += f"Distance: {service_distance / 1000:.2f} km\n\n"
                 else:
-                    nearest_services_text += f"No {service_type} found.\n"
+                    nearest_services_text += f"No {service_type.replace('_', ' ')} found.\n\n"
 
             self.nearest_services_label.setText(nearest_services_text.strip())
             self.update_map(paths)
-
-            self.emergency_message_label.setText("Rescue teams dispatched to the location.")
-
+            self.emergency_message_label.setText("Emergency services notified.")
 
     @pyqtSlot(dict)
     def on_link_clicked(self, info_dict):
-        """
-        Slot to handle custom link clicks from the map. 
-        This is triggered by clicking the 'info://' link in the Popup.
-        """
+        """Handle link clicks from map markers"""
         lat = info_dict["lat"]
         lon = info_dict["lon"]
-        radius = info_dict["radius"]
-
-        # Update the side panel label
-        new_text = f"Disaster Coordinates:\nCoordinates: {lat}, {lon}, Radius: {radius}"
-        self.coordinates_label.setText(new_text)
-
+        self.coord_input.setText(f"{lat}, {lon}")
+        
 class DisasterResponseUI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -347,7 +377,7 @@ class DisasterResponseUI(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle('Disaster Response System')
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1200, 600)
 
         # Create stacked layout
         self.stacked_layout = QStackedLayout()
@@ -360,7 +390,7 @@ class DisasterResponseUI(QMainWindow):
 
         # Add some sample danger zones
         self.disaster_graph.add_danger_zone(24.8700, 67.0200, 200)  # Updated coordinates
-        self.disaster_graph.add_danger_zone(24.8725, 67.0200, 150)  # Updated coordinates
+        self.disaster_graph.add_danger_zone(24.8625, 67.0030, 150)  # Updated coordinates
         self.disaster_graph.add_danger_zone(24.8750, 67.0100, 300)  # Updated coordinates
 
         # Add welcome page

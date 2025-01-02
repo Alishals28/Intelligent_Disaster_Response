@@ -22,15 +22,18 @@ shelters = [
 ]
 
 # Write to emergency_services.csv
-with open(r'F:\AI\Project\Disaster-Response-System\src\graph\emergency_services.csv', mode='a', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=["name", "type", "latitude", "longitude"])
+with open(r'F:\AI\Project\Disaster-Response-System\src\graph\emergency_services.csv', mode='w', newline='') as file:
+    writer = csv.DictWriter(file, fieldnames=["name", "type", "latitude", "longitude", "capacity"])
+    writer.writeheader()
     for record in emergency_services:
+        record["capacity"] = random.randint(1, 10)  # Add capacity field
         writer.writerow(record)
 
 # Write to shelters.csv
-with open(r'F:\AI\Project\Disaster-Response-System\src\graph\shelters.csv', mode='a', newline='') as file:
+with open(r'F:\AI\Project\Disaster-Response-System\src\graph\shelters.csv', mode='w', newline='') as file:
     writer = csv.DictWriter(file, fieldnames=["name", "capacity", "latitude", "longitude"])
+    writer.writeheader()
     for record in shelters:
         writer.writerow(record)
 
-print("Additional records added to emergency_services.csv and shelters.csv")
+print("Fixed records added to emergency_services.csv and shelters.csv")

@@ -170,7 +170,7 @@ class MapPage(QWidget):
 
     def update_map(self, paths=None):
         # Generate the map
-        m = folium.Map(location=[24.8607, 67.0011], zoom_start=13)
+        m = folium.Map(location=[24.8700, 67.0100], zoom_start=13)
 
         # Add emergency services to the map
         for node, data in self.disaster_graph.emergency_services.items():

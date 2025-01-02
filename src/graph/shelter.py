@@ -77,6 +77,16 @@ class PathFinder:
                     heappush(open_set, (f_score[neighbor], neighbor))
 
         return None
+    
+    def reconstruct_path(self, came_from, current):
+        """
+        Reconstruct the path from start to end
+        """
+        total_path = [current]
+        while current in came_from:
+            current = came_from[current]
+            total_path.append(current)
+        return total_path[::-1]
 
     def get_path_coordinates(self, path):
         """
@@ -136,7 +146,7 @@ def main():
     disaster_graph.load_shelters()
 
     # Add a sample danger zone
-    danger_zone_lat, danger_zone_lon = 24.8750, 67.0100
+    danger_zone_lat, danger_zone_lon = 24.8750, 67.0200
     disaster_graph.add_danger_zone(danger_zone_lat, danger_zone_lon, 200)  # 200m radius
 
     # Initialize the pathfinder
