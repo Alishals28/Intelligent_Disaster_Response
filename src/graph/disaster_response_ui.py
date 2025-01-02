@@ -343,7 +343,7 @@ class MapPage(QWidget):
 
         else:
             # Find nearest emergency services
-            services = ['police_station','hospital','fire_station', '']
+            services = ['police_station','hospital','fire_station']
             paths = []
             nearest_services_text = ""
 
@@ -353,7 +353,6 @@ class MapPage(QWidget):
                 )
                 if service_path:
                     paths.append(service_path)
-                    nearest_services_text += f"Nearest {service_type.replace('_', ' ').title()}:\n"
                     nearest_services_text += f"Name: {service_name}\n"
                     nearest_services_text += f"Distance: {service_distance / 1000:.2f} km\n\n"
                 else:
